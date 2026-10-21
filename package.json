@@ -1,0 +1,9 @@
+{
+  "name": "threejs-exam",
+  "version": "1.0.0",
+  "description": "Minimal Three.js Exam Game",
+  "scripts": {
+    "dev": "npx serve .",
+    "start": "npx serve ."
+  }
+}

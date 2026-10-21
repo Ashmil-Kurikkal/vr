@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Three.js Exam Game - Lion, Cow, Hyena</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: sans-serif;
+    }
+
+    #hud {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      color: white;
+      background: rgba(0, 0, 0, 0.75);
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    .legend {
+      font-size: 13px;
+      font-weight: normal;
+      color: #ddd;
+      margin-top: 6px;
+    }
+  </style>
+  <!-- Three.js CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+
+<body>
+
+  <!-- Minimal HUD -->
+  <div id="hud">
+    🦁 Score: <span id="score">0</span> &nbsp;|&nbsp; ❤️ Life: <span id="life">100</span>
+    <div class="legend">Controls: WASD or Arrow Keys | 🦁 Box | 🐮 Cylinder | 🐺 Cone</div>
+  </div>
+
+  <script>
+    // -----------------------------------------------------------------
+    // 1. SCENE, CAMERA, RENDERER
+    // -----------------------------------------------------------------
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a202c);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 14, 16);
+    camera.lookAt(0, 0, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // -----------------------------------------------------------------
+    // 2. LIGHTING & GROUND
+    // -----------------------------------------------------------------
+    const light = new THREE.DirectionalLight(0xffffff, 1.2);
+    light.position.set(5, 15, 8);
+    scene.add(light, new THREE.AmbientLight(0x555555));
+
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(24, 24),
+      new THREE.MeshLambertMaterial({ color: 0x2d3748 })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    scene.add(ground);
+
+    // -----------------------------------------------------------------
+    // 3. THE 3 OBJECTS (ABSTRACT SHAPES + IMAGES / COLORS)
+    // -----------------------------------------------------------------
+    const loader = new THREE.TextureLoader();
+
+    // Helper to create material with image texture and fallback color
+    function makeMat(imagePath, color) {
+      return new THREE.MeshLambertMaterial({
+        map: loader.load(imagePath),
+        color: color
+      });
+    }
+
+    // 1) Lion (Player) - Golden Box
+    const lion = new THREE.Mesh(
+      new THREE.BoxGeometry(1.5, 1.5, 1.5),
+      makeMat('assets/lion.jpg', 0xf59e0b)
+    );
+    lion.position.set(0, 0.75, 4);
+    scene.add(lion);
+
+    // 2) Cow (Prey) - White Cylinder
+    const cow = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.7, 0.7, 1.3, 16),
+      makeMat('assets/cow.jpg', 0xffffff)
+    );
+    cow.position.set(-5, 0.65, -3);
+    scene.add(cow);
+
+    // 3) Hyena (Threat) - Red Cone
+    const hyena = new THREE.Mesh(
+      new THREE.ConeGeometry(0.8, 1.8, 8),
+      makeMat('assets/hyena.jpg', 0xef4444)
+    );
+    hyena.position.set(5, 0.9, -4);
+    scene.add(hyena);
+
+    // -----------------------------------------------------------------
+    // 4. KEYBOARD CONTROLS (LION MOVEMENT)
+    // -----------------------------------------------------------------
+    const keys = {};
+    window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; });
+    window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+    // -----------------------------------------------------------------
+    // 5. GAME LOOP & INTERSECTIONS
+    // -----------------------------------------------------------------
+    let score = 0;
+    let life = 100;
+    let lastHitTime = 0;
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      if (life > 0) {
+        // Lion Movement
+        const speed = 0.15;
+        if (keys['w'] || keys['arrowup']) lion.position.z -= speed;
+        if (keys['s'] || keys['arrowdown']) lion.position.z += speed;
+        if (keys['a'] || keys['arrowleft']) lion.position.x -= speed;
+        if (keys['d'] || keys['arrowright']) lion.position.x += speed;
+
+        // Chasing Logic: Hyena chases Lion
+        const hyenaSpeed = 0.04;
+        if (hyena.position.x < lion.position.x) hyena.position.x += hyenaSpeed;
+        if (hyena.position.x > lion.position.x) hyena.position.x -= hyenaSpeed;
+        if (hyena.position.z < lion.position.z) hyena.position.z += hyenaSpeed;
+        if (hyena.position.z > lion.position.z) hyena.position.z -= hyenaSpeed;
+
+        // Cow gentle rotation
+        cow.rotation.y += 0.02;
+
+        // --- INTERSECTION 1: Lion & Cow (Score Increments) ---
+        if (lion.position.distanceTo(cow.position) < 1.5) {
+          score += 10;
+          document.getElementById('score').innerText = score;
+          // Respawn cow at a new random position
+          cow.position.x = (Math.random()*14);
+          cow.position.z = (Math.random())*14;
+        }
+
+        // --- INTERSECTION 2: Lion & Hyena (Life Decreases) ---
+        if (lion.position.distanceTo(hyena.position) < 1.5) {
+          life = Math.max(0, life - 20);
+          document.getElementById('life').innerText = life;
+          // Respawn Hyena at a distance so it chases again
+          hyena.position.set(8, 0.9, -8);
+
+          if (life === 0) {
+            document.getElementById('hud').innerHTML += ' <span style="color:#ef4444"> — GAME OVER!</span>';
+          }
+        }
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    // Window Resize
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+
+</html>
