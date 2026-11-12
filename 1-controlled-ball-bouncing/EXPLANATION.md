@@ -1,61 +1,52 @@
 # Controlled Ball Bouncing - Code Explanation & Viva Guide
 
-This project implements a 3D bouncing ball simulation with full player control using Three.js.
+This project demonstrates a simple bouncing ball simulation where two balls bounce on the ground, with one ball having player-controlled directional movement.
 
 ---
 
 ## 1. Project Overview
 
-- **Ball**: Sphere with basketball texture that bounces under gravity and user control.
-- **Paddle**: A rectangular box controlled by the player using WASD or Arrow Keys.
-- **Bounce Control**: 
-  - Keys `1`, `2`, `3` switch between Low, Medium, and High bounce strength.
-  - `Spacebar` applies a Super Bounce boost.
-  - Moving the paddle changes the bounce angle and scores points.
+- **Ball 1 (Stationary Bounce)**: A sphere with texture that continuously bounces up and down in its position.
+- **Ball 2 (Controlled Direction)**: A sphere with texture that bounces up and down while the player controls its horizontal movement (X and Z axes) using WASD or Arrow Keys.
+- **Ground**: A flat plane acting as the floor.
 
 ---
 
 ## 2. Key Code Sections
 
 ### 1. Scene, Camera, and Renderer
-- `THREE.Scene()`: Holds all 3D objects, lights, and background color (`#1a202c`).
-- `THREE.PerspectiveCamera(60, aspect, 0.1, 1000)`: Simulates real-world perspective. Positioned at `(0, 14, 16)` looking down at the court.
-- `THREE.WebGLRenderer`: Renders the 3D scene onto an HTML5 `<canvas>` element.
+- Standard Three.js setup with `THREE.Scene()`, `THREE.PerspectiveCamera(60, aspect, 0.1, 1000)` positioned at `(0, 10, 14)`, and `THREE.WebGLRenderer()`.
 
 ### 2. Lighting & Ground
-- `THREE.DirectionalLight`: Strong directional light casting brightness on objects.
-- `THREE.AmbientLight`: Soft general light so shadows are not completely black.
-- `THREE.TextureLoader().load(...)`: Loads textures for the court, paddle, and ball with fallback colors.
+- `THREE.DirectionalLight` and `THREE.AmbientLight` provide illumination.
+- A `THREE.PlaneGeometry(24, 24)` floor rotated flat (`rotation.x = -Math.PI / 2`).
 
-### 3. Objects
-- **Paddle**: `THREE.BoxGeometry(3.6, 0.4, 2.6)` with paddle texture.
-- **Ball**: `THREE.SphereGeometry(0.7, 24, 24)` with ball texture.
+### 3. The Two Balls
+- **Ball 1**: `THREE.SphereGeometry(0.8, 24, 24)` positioned at `(-3, 0.8, 0)`.
+- **Ball 2**: `THREE.SphereGeometry(0.8, 24, 24)` positioned at `(3, 0.8, 0)`.
 
-### 4. Player Controls
-- `window.addEventListener('keydown', ...)`:
-  - WASD / Arrow keys update `keys` object for smooth movement.
-  - Key `1`: Low bounce (`0.16`).
-  - Key `2`: Medium bounce (`0.23`).
-  - Key `3`: High bounce (`0.32`).
-  - Spacebar: Instant super boost (`bouncePower * 1.5`).
+### 4. Keyboard Controls
+- Listens to `keydown` and `keyup` events to track active keys in the `keys` object.
 
-### 5. Physics & Collision Logic
-- **Gravity & Velocity**:
+### 5. Game Loop & Bouncing Logic
+- **Gravity & Bounce**:
+  For each ball, gravity decreases the vertical speed each frame:
   ```javascript
   speedY -= gravity;
   ball.position.y += speedY;
-  ball.position.x += speedX;
-  ball.position.z += speedZ;
-  ```
-- **Paddle Collision**:
-  Checks if the bottom of the ball hits the top of the paddle within the paddle's width and depth:
-  ```javascript
-  if (ball.position.y <= paddleTop && hitX && hitZ && speedY < 0) {
-    speedY = bouncePower;
-    score += 1;
+  if (ball.position.y <= 0.8) {
+    ball.position.y = 0.8;
+    speedY = bounceSpeed; // resets upward velocity
   }
   ```
-- **Floor Bounce**: If the ball misses the paddle and hits the ground floor, it bounces weakly so play continues.
+- **Directional Control**:
+  Ball 2 moves horizontally based on user input:
+  ```javascript
+  if (keys['w'] || keys['arrowup']) ball2.position.z -= moveSpeed;
+  if (keys['s'] || keys['arrowdown']) ball2.position.z += moveSpeed;
+  if (keys['a'] || keys['arrowleft']) ball2.position.x -= moveSpeed;
+  if (keys['d'] || keys['arrowright']) ball2.position.x += moveSpeed;
+  ```
 
 ---
 
@@ -65,4 +56,3 @@ Run in terminal:
 npx serve .
 ```
 Open `http://localhost:3000/1-controlled-ball-bouncing/` in your browser.
-

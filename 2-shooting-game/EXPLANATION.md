@@ -1,62 +1,67 @@
-# Simple Shooting Target Game - Code Explanation & Viva Guide
+# Simple Shooting Target Game - Viva & Lab Guide
 
-This project implements a 3D first-person shooting game answering all parts of the lab specification:
-- a) Shoot a ray from the centre of the camera when the mouse button is clicked.
-- b) When a target is hit, destroy it and increase the score.
-- c) Add a reset button to restore all targets and the score.
-- d) Play a hit sound when a target is successfully hit.
-
----
-
-## 1. Project Overview
-
-- **Camera**: First-person perspective camera that can be aimed using the mouse.
-- **Gun**: 3D gun object (box geometry with gun texture + barrel) attached directly to the camera with a recoil animation on firing.
-- **Targets**: Three target spheres with target texture floating in 3D space.
-- **Crosshair**: Centered `+` crosshair on screen.
+This project strictly implements the basic requirements of Question 5:
+- **Player Camera**: A standard perspective camera facing the targets.
+- **Three Target Spheres**: Normal red spheres placed in 3D space.
+- **Gun**: A simple cube textured with a gun image.
+- **a) Ray from camera**: Uses `THREE.Raycaster` when the mouse button is clicked.
+- **b) Target hit & destroy**: Hides the hit sphere (`visible = false`) and increases score by 10.
+- **c) Reset button**: Restores all target spheres and resets the score to 0.
+- **d) Hit sound**: Plays a simple beep on target hit using Web Audio API.
 
 ---
 
-## 2. Step-by-Step Viva Explanation
+## Code Breakdown
 
-### a) Raycasting from the Centre of the Camera
-- A `THREE.Raycaster` is used.
-- The screen centre coordinate in Normalized Device Coordinates (NDC) is `(0, 0)`.
-- `raycaster.setFromCamera(new THREE.Vector2(0, 0), camera)` casts an invisible ray forward from the camera's optical centre directly through the crosshair.
+### 1. Scene, Camera, and Light
+- Perspective camera placed at `(0, 1.5, 5)` looking toward `(0, 1.5, 0)`.
+- Standard directional light and ambient light.
 
-### b) Target Hit Detection & Destruction
-- `const hits = raycaster.intersectObjects(targets.filter(t => t.visible));`
-- If an intersection is found:
-  - `hitTarget.visible = false;` (destroys/hides the target).
-  - `score += 10;` (updates score display).
-  - Triggers the hit sound.
+### 2. Objects
+- **Gun**: Single box geometry `BoxGeometry(0.4, 0.3, 1.2)` with `assets/gun.jpg`.
+- **Targets**: Three spheres with red material `MeshLambertMaterial({ color: 0xef4444 })`.
 
-### c) Reset Button
-- An HTML button `<button id="reset-btn">Reset</button>` is styled in the HUD.
-- When clicked:
-  ```javascript
+### 3. Raycasting & Sound (Points a, b, d)
+```javascript
+// d) Sound
+function playHitSound() {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const osc = ctx.createOscillator();
+  osc.connect(ctx.destination);
+  osc.start();
+  osc.stop(ctx.currentTime + 0.1);
+}
+
+// a) & b) Raycasting on click
+window.addEventListener('click', e => {
+  if (e.target.id === 'reset') return;
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(targets.filter(t => t.visible));
+
+  if (hits.length > 0) {
+    hits[0].object.visible = false;
+    score += 10;
+    document.getElementById('score').innerText = score;
+    playHitSound();
+  }
+});
+```
+
+### 4. Reset Button (Point c)
+```javascript
+document.getElementById('reset').addEventListener('click', () => {
   score = 0;
   targets.forEach(t => t.visible = true);
-  ```
-  Restores all 3 targets and resets the score counter to 0.
-
-### d) Sound on Target Hit
-- Uses the browser's built-in **Web Audio API** (`AudioContext`).
-- Creates an oscillator node playing a tone that sweeps downward:
-  ```javascript
-  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  const osc = audioCtx.createOscillator();
-  osc.frequency.setValueAtTime(600, audioCtx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(140, audioCtx.currentTime + 0.14);
-  ```
-- Self-contained: requires no external mp3/wav files and never fails to load.
+  document.getElementById('score').innerText = score;
+});
+```
 
 ---
 
-## 3. How to Run
-Run in terminal:
+## How to Run
 ```bash
 npx serve .
 ```
-Open `http://localhost:3000/2-shooting-game/` in your browser.
-
+Visit `http://localhost:3000/2-shooting-game/` in your browser.

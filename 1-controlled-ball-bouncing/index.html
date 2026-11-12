@@ -13,21 +13,10 @@
 
     #hud {
       position: absolute;
-      top: 15px;
-      left: 15px;
+      top: 10px;
+      left: 10px;
       color: white;
-      background: rgba(0, 0, 0, 0.75);
-      padding: 10px 18px;
-      border-radius: 8px;
-      font-size: 20px;
-      font-weight: bold;
-    }
-
-    .legend {
-      font-size: 13px;
-      font-weight: normal;
-      color: #ddd;
-      margin-top: 6px;
+      font-size: 18px;
     }
   </style>
   <!-- Three.js CDN -->
@@ -36,11 +25,7 @@
 
 <body>
 
-  <!-- Minimal HUD -->
-  <div id="hud">
-    Score: <span id="score">0</span> &nbsp;|&nbsp; Bounce Power: <span id="power">Medium</span>
-    <div class="legend">Controls: WASD or Arrow Keys to move paddle | Keys 1, 2, 3: Change Bounce | Space: Super Bounce</div>
-  </div>
+  <div id="hud">Ball Bouncing</div>
 
   <script>
     // -----------------------------------------------------------------
@@ -50,10 +35,10 @@
     scene.background = new THREE.Color(0x1a202c);
 
     const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 14, 16);
+    camera.position.set(0, 10, 14);
     camera.lookAt(0, 2, 0);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
@@ -66,7 +51,6 @@
 
     const loader = new THREE.TextureLoader();
 
-    // Helper to create material with image texture and fallback color
     function makeMat(imagePath, color) {
       return new THREE.MeshLambertMaterial({
         map: loader.load(imagePath),
@@ -82,119 +66,76 @@
     scene.add(ground);
 
     // -----------------------------------------------------------------
-    // 3. THE OBJECTS (PADDLE & BOUNCING BALL)
+    // 3. THE TWO BOUNCING BALLS
     // -----------------------------------------------------------------
-    // 1) Paddle (Controlled by Player) - Box with texture
-    const paddle = new THREE.Mesh(
-      new THREE.BoxGeometry(3.6, 0.4, 2.6),
-      makeMat('assets/paddle.jpg', 0xef4444)
-    );
-    paddle.position.set(0, 0.5, 0);
-    scene.add(paddle);
-
-    // 2) Bouncing Ball - Sphere with basketball texture
-    const ball = new THREE.Mesh(
-      new THREE.SphereGeometry(0.7, 24, 24),
+    // 1) Ball 1 - Bounces in place
+    const ball1 = new THREE.Mesh(
+      new THREE.SphereGeometry(0.8, 24, 24),
       makeMat('assets/ball.jpg', 0xf59e0b)
     );
-    ball.position.set(0, 6, 0);
-    scene.add(ball);
+    ball1.position.set(-3, 0.8, 0);
+    scene.add(ball1);
+
+    // 2) Ball 2 - Direction controllable
+    const ball2 = new THREE.Mesh(
+      new THREE.SphereGeometry(0.8, 24, 24),
+      makeMat('assets/ball2.jpg', 0x3b82f6)
+    );
+    ball2.position.set(3, 0.8, 0);
+    scene.add(ball2);
 
     // -----------------------------------------------------------------
     // 4. KEYBOARD CONTROLS
     // -----------------------------------------------------------------
     const keys = {};
-    let bouncePower = 0.23;
-
-    window.addEventListener('keydown', e => {
-      keys[e.key.toLowerCase()] = true;
-
-      // Bounce power controls
-      if (e.key === '1') {
-        bouncePower = 0.16;
-        document.getElementById('power').innerText = 'Low';
-      }
-      if (e.key === '2') {
-        bouncePower = 0.23;
-        document.getElementById('power').innerText = 'Medium';
-      }
-      if (e.key === '3') {
-        bouncePower = 0.32;
-        document.getElementById('power').innerText = 'High';
-      }
-    });
-
-    window.addEventListener('keyup', e => {
-      keys[e.key.toLowerCase()] = false;
-    });
+    window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; });
+    window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 
     // -----------------------------------------------------------------
-    // 5. GAME LOOP & BOUNCE PHYSICS
+    // 5. GAME LOOP & BOUNCING
     // -----------------------------------------------------------------
-    let score = 0;
-    let speedY = 0;
-    let speedX = 0.04;
-    let speedZ = 0.03;
-    const gravity = 0.007;
+    const gravity = 0.008;
+    const bounceSpeed = 0.22;
+    let speedY1 = 0.22;
+    let speedY2 = 0.22;
 
     function animate() {
       requestAnimationFrame(animate);
 
-      // Paddle Movement
-      const paddleSpeed = 0.16;
-      if (keys['w'] || keys['arrowup']) paddle.position.z -= paddleSpeed;
-      if (keys['s'] || keys['arrowdown']) paddle.position.z += paddleSpeed;
-      if (keys['a'] || keys['arrowleft']) paddle.position.x -= paddleSpeed;
-      if (keys['d'] || keys['arrowright']) paddle.position.x += paddleSpeed;
-
-      // Keep paddle inside court
-      paddle.position.x = Math.max(-9, Math.min(9, paddle.position.x));
-      paddle.position.z = Math.max(-9, Math.min(9, paddle.position.z));
-
-      // Spacebar Boost / Super Bounce
-      if (keys[' ']) {
-        speedY = bouncePower * 1.5;
+      // Ball 1: Bounce
+      speedY1 -= gravity;
+      ball1.position.y += speedY1;
+      if (ball1.position.y <= 0.8) {
+        ball1.position.y = 0.8;
+        speedY1 = bounceSpeed;
       }
 
-      // Ball Physics
-      speedY -= gravity;
-      ball.position.y += speedY;
-      ball.position.x += speedX;
-      ball.position.z += speedZ;
-
-      // Ball rotation for realistic roll
-      ball.rotation.x += speedZ * 2;
-      ball.rotation.z -= speedX * 2;
-
-      // Bounce off invisible court boundaries
-      if (ball.position.x > 9.5 || ball.position.x < -9.5) speedX = -speedX;
-      if (ball.position.z > 9.5 || ball.position.z < -9.5) speedZ = -speedZ;
-
-      // Collision: Ball & Paddle
-      const paddleTop = paddle.position.y + 0.3;
-      const hitX = Math.abs(ball.position.x - paddle.position.x) < 2.0;
-      const hitZ = Math.abs(ball.position.z - paddle.position.z) < 1.5;
-
-      if (ball.position.y <= paddleTop && ball.position.y >= paddleTop - 0.4 && speedY < 0 && hitX && hitZ) {
-        speedY = bouncePower;
-        speedX = (ball.position.x - paddle.position.x) * 0.08;
-        speedZ = (ball.position.z - paddle.position.z) * 0.08;
-        score += 1;
-        document.getElementById('score').innerText = score;
+      // Ball 2: Bounce
+      speedY2 -= gravity;
+      ball2.position.y += speedY2;
+      if (ball2.position.y <= 0.8) {
+        ball2.position.y = 0.8;
+        speedY2 = bounceSpeed;
       }
 
-      // If ball hits the ground (missed the paddle)
-      if (ball.position.y <= 0.7) {
-        ball.position.y = 0.7;
-        speedY = bouncePower * 0.7; // weak bounce
-      }
+      // Ball 2 Movement
+      const moveSpeed = 0.12;
+      if (keys['w'] || keys['arrowup']) ball2.position.z -= moveSpeed;
+      if (keys['s'] || keys['arrowdown']) ball2.position.z += moveSpeed;
+      if (keys['a'] || keys['arrowleft']) ball2.position.x -= moveSpeed;
+      if (keys['d'] || keys['arrowright']) ball2.position.x += moveSpeed;
+
+      ball2.position.x = Math.max(-10, Math.min(10, ball2.position.x));
+      ball2.position.z = Math.max(-10, Math.min(10, ball2.position.z));
+
+      ball1.rotation.y += 0.01;
+      ball2.rotation.y += 0.01;
 
       renderer.render(scene, camera);
     }
 
     animate();
 
-    // Window Resize
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
@@ -204,4 +145,3 @@
 </body>
 
 </html>
-
