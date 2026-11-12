@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Three.js - Simple Shooting Target Game</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: sans-serif;
+    }
+
+    #hud {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      color: white;
+      background: rgba(0, 0, 0, 0.75);
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    .legend {
+      font-size: 13px;
+      font-weight: normal;
+      color: #ddd;
+      margin-top: 6px;
+    }
+
+    #reset-btn {
+      margin-left: 15px;
+      padding: 5px 14px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      background: #ef4444;
+      color: white;
+      border: none;
+      border-radius: 4px;
+    }
+
+    #reset-btn:hover {
+      background: #dc2626;
+    }
+
+    #crosshair {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-size: 32px;
+      line-height: 0;
+      pointer-events: none;
+      user-select: none;
+      font-family: monospace;
+    }
+  </style>
+  <!-- Three.js CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+
+<body>
+
+  <!-- Crosshair in the screen centre -->
+  <div id="crosshair">+</div>
+
+  <!-- Minimal HUD -->
+  <div id="hud">
+    Score: <span id="score">0</span> &nbsp;|&nbsp; Targets Left: <span id="targets-left">3</span>
+    <button id="reset-btn">Reset</button>
+    <div class="legend">Aim with Mouse | Click to Shoot Ray | Reset to Restore</div>
+  </div>
+
+  <script>
+    // -----------------------------------------------------------------
+    // 1. SCENE, CAMERA, RENDERER
+    // -----------------------------------------------------------------
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x111827);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 1.6, 5);
+    scene.add(camera);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // -----------------------------------------------------------------
+    // 2. LIGHTING & GROUND
+    // -----------------------------------------------------------------
+    const light = new THREE.DirectionalLight(0xffffff, 1.2);
+    light.position.set(5, 15, 8);
+    scene.add(light, new THREE.AmbientLight(0x666666));
+
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(30, 30),
+      new THREE.MeshLambertMaterial({ color: 0x1f2937 })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    scene.add(ground);
+
+    const loader = new THREE.TextureLoader();
+
+    // Helper to create material with image texture and fallback color
+    function makeMat(imagePath, color) {
+      return new THREE.MeshLambertMaterial({
+        map: loader.load(imagePath),
+        color: color
+      });
+    }
+
+    // -----------------------------------------------------------------
+    // 3. THE GUN & THREE TARGET SPHERES
+    // -----------------------------------------------------------------
+    // One Gun (attached to camera for first person view)
+    const gun = new THREE.Group();
+
+    // Gun body - cube with gun texture
+    const gunBody = new THREE.Mesh(
+      new THREE.BoxGeometry(0.24, 0.32, 0.85),
+      makeMat('assets/gun.jpg', 0x374151)
+    );
+    gunBody.position.set(0, 0, 0);
+    gun.add(gunBody);
+
+    // Gun barrel - cylinder
+    const gunBarrel = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.05, 0.05, 0.5, 16),
+      new THREE.MeshLambertMaterial({ color: 0x111827 })
+    );
+    gunBarrel.rotation.x = Math.PI / 2;
+    gunBarrel.position.set(0, 0.05, -0.55);
+    gun.add(gunBarrel);
+
+    gun.position.set(0.35, -0.3, -0.7);
+    camera.add(gun);
+
+    // Three Target Spheres to shoot at
+    const targets = [];
+    const positions = [
+      { x: -3.5, y: 2.2, z: -7 },
+      { x: 0.0,  y: 3.2, z: -9 },
+      { x: 3.5,  y: 2.0, z: -7 }
+    ];
+
+    positions.forEach((pos, i) => {
+      const sphere = new THREE.Mesh(
+        new THREE.SphereGeometry(0.75, 24, 24),
+        makeMat('assets/target.jpg', 0xef4444)
+      );
+      sphere.position.set(pos.x, pos.y, pos.z);
+      sphere.userData = { initialY: pos.y, phase: i * 2 };
+      scene.add(sphere);
+      targets.push(sphere);
+    });
+
+    // -----------------------------------------------------------------
+    // 4. CONTROLS, SHOOTING RAY & SOUND
+    // -----------------------------------------------------------------
+    let score = 0;
+
+    // Mouse look to aim
+    window.addEventListener('mousemove', e => {
+      const x = (e.clientX / window.innerWidth) * 2 - 1;
+      const y = -(e.clientY / window.innerHeight) * 2 + 1;
+      camera.rotation.y = -x * 0.7;
+      camera.rotation.x = y * 0.4;
+    });
+
+    // Web Audio Hit Sound (Requirement d)
+    function playHitSound() {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(140, audioCtx.currentTime + 0.14);
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.14);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.14);
+      } catch (err) {
+        console.log(err);
+      }
+    }
+
+    // Raycaster from camera centre (Requirement a)
+    const raycaster = new THREE.Raycaster();
+    const screenCenter = new THREE.Vector2(0, 0);
+
+    window.addEventListener('click', e => {
+      // Don't shoot if clicking reset button
+      if (e.target.id === 'reset-btn') return;
+
+      // Gun recoil animation
+      gun.position.z += 0.12;
+      setTimeout(() => { gun.position.z = -0.7; }, 70);
+
+      // Raycast from the centre of the camera
+      raycaster.setFromCamera(screenCenter, camera);
+      const activeTargets = targets.filter(t => t.visible);
+      const hits = raycaster.intersectObjects(activeTargets);
+
+      // Destroy target & increase score & sound (Requirement b, d)
+      if (hits.length > 0) {
+        const hitTarget = hits[0].object;
+        hitTarget.visible = false;
+        score += 10;
+        document.getElementById('score').innerText = score;
+        document.getElementById('targets-left').innerText = targets.filter(t => t.visible).length;
+        playHitSound();
+      }
+    });
+
+    // Reset Button (Requirement c)
+    document.getElementById('reset-btn').addEventListener('click', () => {
+      score = 0;
+      targets.forEach(t => t.visible = true);
+      document.getElementById('score').innerText = score;
+      document.getElementById('targets-left').innerText = targets.length;
+    });
+
+    // -----------------------------------------------------------------
+    // 5. GAME LOOP & TARGET MOVEMENT
+    // -----------------------------------------------------------------
+    function animate() {
+      requestAnimationFrame(animate);
+
+      // Rotate targets and gentle floating motion
+      targets.forEach(t => {
+        if (t.visible) {
+          t.rotation.y += 0.02;
+          t.position.y = t.userData.initialY + Math.sin(Date.now() * 0.003 + t.userData.phase) * 0.25;
+        }
+      });
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    // Window Resize
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+
+</html>
+
